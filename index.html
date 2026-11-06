@@ -6,13 +6,17 @@
 <meta name="theme-color" content="#f8eafa">
 <link rel="manifest" href="manifest.webmanifest">
 <title>My Workout Calendar</title>
+
 <style>
 *{box-sizing:border-box}
-body{margin:0;padding:20px;font-family:Arial,sans-serif;background:#fff9fc;color:#514b59}
+body{margin:0;padding:18px;font-family:Arial,sans-serif;background:#fff9fc;color:#514b59}
 header{text-align:center}
-h1{color:#9b78a8;font-size:27px}
+h1{color:#9b78a8;font-size:26px}
 button,select{border:0;border-radius:12px;padding:11px;background:#f0e5f4;color:#514b59;font-size:15px}
 button{cursor:pointer}
+.tabs{display:flex;gap:8px;margin:20px 0}
+.tabs button{flex:1;background:#f0e5f4}
+.tabs button.active{background:#d9c5e8;outline:2px solid #b48bc4}
 .month{display:flex;justify-content:space-between;align-items:center;margin:22px 0}
 .month h2{font-size:20px}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
@@ -27,18 +31,48 @@ select{width:100%;padding:13px}
 #save{background:#d9c5e8;width:100%;margin-top:15px}
 #complete{background:#d9eddf;width:100%;margin-top:9px}
 #stats{text-align:center;color:#8b7893;font-size:14px;margin:18px}
+.year-summary{background:white;border-radius:18px;padding:15px;margin-top:16px;box-shadow:0 2px 12px #e9dce9}
+.year-head{display:flex;justify-content:space-between;align-items:center;margin:5px 0 14px}
+.year-head h2{margin:0;font-size:22px}
+.heat-wrap{overflow-x:auto;padding-bottom:8px}
+.month-labels,.heatmap{display:grid;grid-template-columns:repeat(53,minmax(8px,1fr));gap:3px;min-width:560px}
+.month-labels{margin-bottom:7px;color:#988b9c;font-size:10px}
+.month-labels span{white-space:nowrap}
+.heatmap{grid-template-rows:repeat(7,13px);grid-auto-flow:column}
+.heat-cell{width:100%;height:13px;border-radius:3px;background:#eee9ee}
+.heat-cell.trained{background:#b77bd1}
+.heat-cell.today{outline:1px solid #8b679c}
+.weekdays{display:flex;flex-direction:column;gap:6px;margin-right:7px;padding-top:0;color:#988b9c;font-size:9px}
+.heat-row{display:flex;align-items:flex-start}
+.legend{display:flex;align-items:center;gap:7px;justify-content:flex-end;color:#988b9c;font-size:11px;margin-top:12px}
+.legend i{width:11px;height:11px;border-radius:3px;background:#eee9ee}
+.legend i.on{background:#b77bd1}
+.year-total{text-align:center;color:#8b7893;margin:16px 0 4px;font-size:14px}
+.hidden{display:none}
+@media(max-width:380px){
+ body{padding:12px}
+ .heatmap,.month-labels{min-width:510px}
+}
 </style>
 </head>
+
 <body>
+
 <header>
 <h1>♡ My Workout Calendar</h1>
 <p>A little progress every day</p>
 </header>
 
+<nav class="tabs" aria-label="Calendar views">
+<button id="monthTab" class="active" type="button" onclick="showView('month')">Monthly</button>
+<button id="yearTab" type="button" onclick="showView('year')">Gym Years</button>
+</nav>
+
+<main id="monthView">
 <div class="month">
-<button onclick="changeMonth(-1)">‹</button>
+<button type="button" onclick="changeMonth(-1)">‹</button>
 <h2 id="month"></h2>
-<button onclick="changeMonth(1)">›</button>
+<button type="button" onclick="changeMonth(1)">›</button>
 </div>
 
 <div class="grid" id="calendar"></div>
@@ -46,6 +80,7 @@ select{width:100%;padding:13px}
 
 <section class="panel">
 <h3 id="selectedTitle">Choose a day</h3>
+
 <label for="focus">Workout focus</label>
 <select id="focus">
 <option value="">Rest / No workout</option>
@@ -59,64 +94,269 @@ select{width:100%;padding:13px}
 <option>Cardio</option>
 <option>Full Body</option>
 </select>
-<button id="save" onclick="saveDay()">Save workout</button>
-<button id="complete" onclick="completeDay()">Mark as completed ✓</button>
+
+<button id="save" type="button" onclick="saveDay()">Save workout</button>
+<button id="complete" type="button" onclick="completeDay()">Mark as completed ✓</button>
 </section>
+</main>
+
+<main id="yearView" class="hidden">
+<section class="year-summary">
+
+<div class="year-head">
+<button type="button" onclick="changeYear(-1)">‹</button>
+<h2 id="yearTitle"></h2>
+<button type="button" onclick="changeYear(1)">›</button>
+</div>
+
+<div class="heat-wrap">
+<div class="month-labels" id="monthLabels"></div>
+
+<div class="heat-row">
+<div class="weekdays">
+<span>M</span>
+<span>T</span>
+<span>W</span>
+<span>T</span>
+<span>F</span>
+<span>S</span>
+<span>S</span>
+</div>
+
+<div class="heatmap" id="heatmap"></div>
+</div>
+</div>
+
+<div class="legend">
+<span>Rest</span>
+<i></i>
+<span>Trained</span>
+<i class="on"></i>
+</div>
+
+<p class="year-total" id="yearTotal"></p>
+</section>
+</main>
 
 <script>
+
 const colours={
-"Back":"#dce9f7","Glutes":"#f7dce8","Legs":"#f8e7c9",
-"Arms":"#e8def7","Chest":"#d9eee8","Shoulders":"#f7e1d5",
-"Core":"#e8e5fa","Cardio":"#f8e9b9",
-"Full Body":"#d9e9e9","Rest / No workout":"#eee9ee"
+"Back":"#dce9f7",
+"Glutes":"#f7dce8",
+"Legs":"#f8e7c9",
+"Arms":"#e8def7",
+"Chest":"#d9eee8",
+"Shoulders":"#f7e1d5",
+"Core":"#e8e5fa",
+"Cardio":"#f8e9b9",
+"Full Body":"#d9e9e9",
+"Rest / No workout":"#eee9ee"
 };
-let date=new Date();
-let selected=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+
+let date=new Date(),
+selected=new Date(date.getFullYear(),date.getMonth(),date.getDate()),
+yearShown=date.getFullYear();
+
 let workouts=JSON.parse(localStorage.getItem("workouts")||"{}");
+
 const key=d=>d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate();
+
+function showView(view){
+ document.getElementById("monthView").classList.toggle("hidden",view!=="month");
+ document.getElementById("yearView").classList.toggle("hidden",view!=="year");
+
+ document.getElementById("monthTab").classList.toggle("active",view==="month");
+ document.getElementById("yearTab").classList.toggle("active",view==="year");
+
+ if(view==="year")renderYear();
+}
+
 function render(){
-let y=date.getFullYear(),m=date.getMonth();
-document.getElementById("month").textContent=
-date.toLocaleString("default",{month:"long",year:"numeric"});
-let first=new Date(y,m,1).getDay();
-let count=new Date(y,m+1,0).getDate();
-let html=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
-.map(x=>`<div class="dayname">${x}</div>`).join("");
-for(let i=0;i<(first+6)%7;i++)html+="<div></div>";
-for(let n=1;n<=count;n++){
-let d=new Date(y,m,n),k=key(d),w=workouts[k]||{};
-let name=w.focus||"";
-let colour=colours[name]||"#f5f0f6";
-html+=`<div class="day ${key(selected)===k?"selected":""} ${w.done?"done":""}" style="background:${colour}" onclick="pick(${n})">${n}<small>${name}${w.done?" ✓":""}</small></div>`;
+
+ let y=date.getFullYear(),m=date.getMonth();
+
+ document.getElementById("month").textContent=
+ date.toLocaleString("default",{month:"long",year:"numeric"});
+
+ let first=new Date(y,m,1).getDay(),
+ count=new Date(y,m+1,0).getDate();
+
+ let html=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+ .map(x=>'<div class="dayname">'+x+'</div>').join("");
+
+ for(let i=0;i<(first+6)%7;i++)html+="<div></div>";
+
+ for(let n=1;n<=count;n++){
+
+  let d=new Date(y,m,n),
+  w=workouts[key(d)]||{},
+  name=w.focus||"",
+  colour=colours[name]||"#f5f0f6";
+
+  html+='<div class="day '+
+  (key(selected)===key(d)?"selected ":"")+
+  (w.done?"done":"")+
+  '" style="background:'+colour+'" onclick="pick('+n+')">'+
+  n+'<small>'+name+(w.done?" ✓":"")+'</small></div>';
+ }
+
+ document.getElementById("calendar").innerHTML=html;
+
+ let values=Object.values(workouts),
+ planned=values.filter(w=>w.focus).length,
+ done=values.filter(w=>w.done).length;
+
+ document.getElementById("stats").textContent=
+ planned+" workouts planned · "+done+" completed";
+
+ loadSelected();
 }
-document.getElementById("calendar").innerHTML=html;
-let values=Object.values(workouts);
-let planned=values.filter(w=>w.focus).length;
-let done=values.filter(w=>w.done).length;
-document.getElementById("stats").textContent=
-`${planned} workouts planned · ${done} completed`;
-loadSelected();
+
+function pick(n){
+ selected=new Date(date.getFullYear(),date.getMonth(),n);
+ render();
 }
-function pick(n){selected=new Date(date.getFullYear(),date.getMonth(),n);render()}
-function changeMonth(amount){date.setMonth(date.getMonth()+amount);render()}
+
+function changeMonth(amount){
+ date.setMonth(date.getMonth()+amount);
+ render();
+}
+
 function loadSelected(){
-let w=workouts[key(selected)]||{};
-document.getElementById("selectedTitle").textContent=
-selected.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
-document.getElementById("focus").value=w.focus||"";
+
+ let w=workouts[key(selected)]||{};
+
+ document.getElementById("selectedTitle").textContent=
+ selected.toLocaleDateString("en-GB",{
+ weekday:"long",
+ day:"numeric",
+ month:"long"
+ });
+
+ document.getElementById("focus").value=w.focus||"";
 }
+
 function saveDay(){
-let k=key(selected),focus=document.getElementById("focus").value;
-workouts[k]={focus,done:workouts[k]?.done||false};
-localStorage.setItem("workouts",JSON.stringify(workouts));render();
+
+ let k=key(selected),
+ focus=document.getElementById("focus").value;
+
+ workouts[k]={
+ focus,
+ done:workouts[k]?.done||false
+ };
+
+ localStorage.setItem("workouts",JSON.stringify(workouts));
+ render();
 }
+
 function completeDay(){
-let k=key(selected);
-workouts[k]=workouts[k]||{focus:""};
-workouts[k].done=!workouts[k].done;
-localStorage.setItem("workouts",JSON.stringify(workouts));render();
+
+ let k=key(selected);
+
+ workouts[k]=workouts[k]||{focus:""};
+ workouts[k].done=!workouts[k].done;
+
+ localStorage.setItem("workouts",JSON.stringify(workouts));
+ render();
 }
+
+function changeYear(amount){
+ yearShown+=amount;
+ renderYear();
+}
+
+function renderYear(){
+
+ document.getElementById("yearTitle").textContent=yearShown;
+
+ const start=new Date(yearShown,0,1),
+ end=new Date(yearShown+1,0,1);
+
+ const startMonday=new Date(start);
+
+ startMonday.setDate(
+ start.getDate()-((start.getDay()+6)%7)
+ );
+
+ const totalDays=Math.round((end-startMonday)/86400000),
+ weeks=Math.ceil(totalDays/7);
+
+ const monthMarks=[];
+
+ for(let m=0;m<12;m++){
+
+  let d=new Date(yearShown,m,1);
+
+  let offset=Math.floor(
+  (d-startMonday)/86400000/7
+  );
+
+  monthMarks.push({
+  week:offset,
+  name:d.toLocaleString("en",{month:"short"})
+  });
+ }
+
+ let labels=Array.from({length:weeks},()=>"");
+
+ monthMarks.forEach(x=>{
+  if(x.week<labels.length)labels[x.week]=x.name;
+ });
+
+ document.getElementById("monthLabels").style.gridTemplateColumns=
+ "repeat("+weeks+",minmax(8px,1fr))";
+
+ document.getElementById("monthLabels").innerHTML=
+ labels.map(x=>"<span>"+x+"</span>").join("");
+
+ document.getElementById("heatmap").style.gridTemplateColumns=
+ "repeat("+weeks+",minmax(8px,1fr))";
+
+ let cells=[],trained=0;
+
+ for(let w=0;w<weeks;w++){
+
+  for(let dow=0;dow<7;dow++){
+
+   let d=new Date(startMonday);
+
+   d.setDate(startMonday.getDate()+w*7+dow);
+
+   let inside=d.getFullYear()===yearShown,
+   item=inside?workouts[key(d)]:null;
+
+   if(item&&item.done)trained++;
+
+   let cell=document.createElement("span");
+
+   cell.className="heat-cell"+
+   (item&&item.done?" trained":"")+
+   (inside&&key(d)===key(new Date())?" today":"");
+
+   cell.title=inside?
+   d.toLocaleDateString("en-GB")+
+   (item&&item.done?" · Trained":" · Rest / no workout")
+   :"";
+
+   cells.push(cell);
+  }
+ }
+
+ document.getElementById("heatmap").replaceChildren(...cells);
+
+ document.getElementById("yearTotal").textContent=
+ trained+" gym "+(trained===1?"day":"days")+" in "+yearShown;
+}
+
 render();
+
+if("serviceWorker" in navigator){
+ window.addEventListener("load",()=>{
+  navigator.serviceWorker.register("./sw.js").catch(()=>{});
+ });
+}
+
 </script>
 </body>
 </html>
