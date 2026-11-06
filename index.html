@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f8eafa">
+<link rel="manifest" href="manifest.webmanifest">
+<title>My Workout Calendar</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:20px;font-family:Arial,sans-serif;background:#fff9fc;color:#514b59}
+header{text-align:center}
+h1{color:#9b78a8;font-size:27px}
+button,select{border:0;border-radius:12px;padding:11px;background:#f0e5f4;color:#514b59;font-size:15px}
+button{cursor:pointer}
+.month{display:flex;justify-content:space-between;align-items:center;margin:22px 0}
+.month h2{font-size:20px}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.dayname{text-align:center;font-size:12px;padding:8px 0;color:#988b9c}
+.day{min-height:65px;border-radius:10px;padding:6px 2px;background:#f5f0f6;text-align:center;font-size:13px;cursor:pointer}
+.day.selected{outline:2px solid #9875a7}
+.day small{display:block;font-size:10px;margin-top:5px;overflow-wrap:anywhere}
+.done{box-shadow:inset 0 0 0 2px #80b99b}
+.panel{background:white;border-radius:18px;padding:18px;margin-top:22px;box-shadow:0 2px 12px #e9dce9}
+label{display:block;margin:12px 0 7px}
+select{width:100%;padding:13px}
+#save{background:#d9c5e8;width:100%;margin-top:15px}
+#complete{background:#d9eddf;width:100%;margin-top:9px}
+#stats{text-align:center;color:#8b7893;font-size:14px;margin:18px}
+</style>
+</head>
+<body>
+<header>
+<h1>♡ My Workout Calendar</h1>
+<p>A little progress every day</p>
+</header>
+
+<div class="month">
+<button onclick="changeMonth(-1)">‹</button>
+<h2 id="month"></h2>
+<button onclick="changeMonth(1)">›</button>
+</div>
+
+<div class="grid" id="calendar"></div>
+<div id="stats"></div>
+
+<section class="panel">
+<h3 id="selectedTitle">Choose a day</h3>
+<label for="focus">Workout focus</label>
+<select id="focus">
+<option value="">Rest / No workout</option>
+<option>Back</option>
+<option>Glutes</option>
+<option>Legs</option>
+<option>Arms</option>
+<option>Chest</option>
+<option>Shoulders</option>
+<option>Core</option>
+<option>Cardio</option>
+<option>Full Body</option>
+</select>
+<button id="save" onclick="saveDay()">Save workout</button>
+<button id="complete" onclick="completeDay()">Mark as completed ✓</button>
+</section>
+
+<script>
+const colours={
+"Back":"#dce9f7","Glutes":"#f7dce8","Legs":"#f8e7c9",
+"Arms":"#e8def7","Chest":"#d9eee8","Shoulders":"#f7e1d5",
+"Core":"#e8e5fa","Cardio":"#f8e9b9",
+"Full Body":"#d9e9e9","Rest / No workout":"#eee9ee"
+};
+let date=new Date();
+let selected=new Date(date.getFullYear(),date.getMonth(),date.getDate());
+let workouts=JSON.parse(localStorage.getItem("workouts")||"{}");
+const key=d=>d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate();
+function render(){
+let y=date.getFullYear(),m=date.getMonth();
+document.getElementById("month").textContent=
+date.toLocaleString("default",{month:"long",year:"numeric"});
+let first=new Date(y,m,1).getDay();
+let count=new Date(y,m+1,0).getDate();
+let html=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+.map(x=>`<div class="dayname">${x}</div>`).join("");
+for(let i=0;i<(first+6)%7;i++)html+="<div></div>";
+for(let n=1;n<=count;n++){
+let d=new Date(y,m,n),k=key(d),w=workouts[k]||{};
+let name=w.focus||"";
+let colour=colours[name]||"#f5f0f6";
+html+=`<div class="day ${key(selected)===k?"selected":""} ${w.done?"done":""}" style="background:${colour}" onclick="pick(${n})">${n}<small>${name}${w.done?" ✓":""}</small></div>`;
+}
+document.getElementById("calendar").innerHTML=html;
+let values=Object.values(workouts);
+let planned=values.filter(w=>w.focus).length;
+let done=values.filter(w=>w.done).length;
+document.getElementById("stats").textContent=
+`${planned} workouts planned · ${done} completed`;
+loadSelected();
+}
+function pick(n){selected=new Date(date.getFullYear(),date.getMonth(),n);render()}
+function changeMonth(amount){date.setMonth(date.getMonth()+amount);render()}
+function loadSelected(){
+let w=workouts[key(selected)]||{};
+document.getElementById("selectedTitle").textContent=
+selected.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+document.getElementById("focus").value=w.focus||"";
+}
+function saveDay(){
+let k=key(selected),focus=document.getElementById("focus").value;
+workouts[k]={focus,done:workouts[k]?.done||false};
+localStorage.setItem("workouts",JSON.stringify(workouts));render();
+}
+function completeDay(){
+let k=key(selected);
+workouts[k]=workouts[k]||{focus:""};
+workouts[k].done=!workouts[k].done;
+localStorage.setItem("workouts",JSON.stringify(workouts));render();
+}
+render();
+</script>
+</body>
+</html>
